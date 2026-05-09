@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ````md
 # Grocery Demand Forecasting with Anomaly Alerts
 
@@ -168,3 +169,6 @@ Md. Nafijul Islam
 
 ```
 ```
+=======
+# Grocery-Demand-Forecasting-with-Anomaly-Alerts
+>>>>>>> e4e2d66fe7976e76fb09c4d597774f3e120bc2e0
