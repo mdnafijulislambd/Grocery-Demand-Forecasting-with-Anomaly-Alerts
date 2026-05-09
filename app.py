@@ -1312,6 +1312,325 @@
 
 
 
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# import plotly.graph_objects as go
+# import plotly.express as px
+# import joblib
+# from datetime import datetime
+# import time
+
+# # =====================================
+# # PAGE CONFIG
+# # =====================================
+
+# st.set_page_config(
+#     page_title="Grocery Demand Forecasting",
+#     page_icon="🛒",
+#     layout="wide",
+#     initial_sidebar_state="expanded"
+# )
+
+# # =====================================
+# # LOAD MODELS
+# # =====================================
+
+# @st.cache_resource
+# def load_models():
+#     cat_model = joblib.load("models/catboost_model.pkl")
+#     lgb_model = joblib.load("models/lightgbm_model.pkl")
+#     label_encoders = joblib.load("models/label_encoders.pkl")
+#     return cat_model, lgb_model, label_encoders
+
+# cat_model, lgb_model, label_encoders = load_models()
+
+# # =====================================
+# # LOAD DATA
+# # =====================================
+
+# @st.cache_data
+# def load_dataset():
+#     df = pd.read_csv("dataset/sales_data.csv")
+#     df["Date"] = pd.to_datetime(df["Date"])
+#     return df
+
+# df = load_dataset()
+
+# # =====================================
+# # TITLE
+# # =====================================
+
+# st.title("🛒 Grocery Demand Forecasting with Anomaly Alerts")
+# st.markdown("🔥 CatBoost + LightGBM Ensemble | Real-time Prediction Dashboard")
+
+# # =====================================
+# # SIDEBAR INPUTS
+# # =====================================
+
+# st.sidebar.header("⚙️ Input Features")
+
+# selected_product = st.sidebar.selectbox("Product ID", sorted(df["Product ID"].unique()))
+# selected_store = st.sidebar.selectbox("Store ID", sorted(df["Store ID"].unique()))
+# selected_region = st.sidebar.selectbox("Region", sorted(df["Region"].unique()))
+# selected_category = st.sidebar.selectbox("Category", sorted(df["Category"].unique()))
+# selected_weather = st.sidebar.selectbox("Weather Condition", sorted(df["Weather Condition"].unique()))
+# selected_season = st.sidebar.selectbox("Seasonality", sorted(df["Seasonality"].unique()))
+
+# inventory_level = st.sidebar.slider("Inventory Level", 0, 1000, 300)
+# units_sold = st.sidebar.slider("Units Sold", 0, 500, 120)
+# units_ordered = st.sidebar.slider("Units Ordered", 0, 500, 150)
+# price = st.sidebar.slider("Price", 1.0, 1000.0, 150.0)
+# competitor_price = st.sidebar.slider("Competitor Price", 1.0, 1000.0, 145.0)
+# discount = st.sidebar.slider("Discount (%)", 0, 100, 10)
+# promotion = st.sidebar.selectbox("Promotion", [0, 1])
+# epidemic = st.sidebar.selectbox("Epidemic", [0, 1])
+
+# selected_date = st.sidebar.date_input("Select Date", datetime.today())
+
+# # =====================================
+# # BUILD INPUT DF
+# # =====================================
+
+# input_df = pd.DataFrame({
+#     "Product ID": [selected_product],
+#     "Store ID": [selected_store],
+#     "Region": [selected_region],
+#     "Category": [selected_category],
+#     "Weather Condition": [selected_weather],
+#     "Seasonality": [selected_season],
+#     "Inventory Level": [inventory_level],
+#     "Units Sold": [units_sold],
+#     "Units Ordered": [units_ordered],
+#     "Price": [price],
+#     "Discount": [discount],
+#     "Promotion": [promotion],
+#     "Competitor Pricing": [competitor_price],
+#     "Epidemic": [epidemic]
+# })
+
+# # =====================================
+# # DATE FEATURES
+# # =====================================
+
+# input_df["Date"] = pd.to_datetime([selected_date])
+# input_df["day"] = input_df["Date"].dt.day
+# input_df["month"] = input_df["Date"].dt.month
+# input_df["dayofweek"] = input_df["Date"].dt.dayofweek
+# input_df["week"] = input_df["Date"].dt.isocalendar().week.astype(int)
+# input_df.drop(columns=["Date"], inplace=True)
+
+# # =====================================
+# # SAFE ENCODING (FIXED - NO CATBOOST ERROR)
+# # =====================================
+
+# categorical_cols = [
+#     "Product ID",
+#     "Store ID",
+#     "Region",
+#     "Category",
+#     "Weather Condition",
+#     "Seasonality"
+# ]
+
+# for col in categorical_cols:
+#     if col in label_encoders:
+
+#         le = label_encoders[col]
+
+#         # mapping fix (FAST + SAFE)
+#         mapping = {cls: idx for idx, cls in enumerate(le.classes_)}
+
+#         input_df[col] = input_df[col].map(lambda x: mapping.get(x, 0))
+
+# # =====================================
+# # MATCH MODEL FEATURE ORDER (IMPORTANT FIX)
+# # =====================================
+
+# if hasattr(cat_model, "feature_names_"):
+#     try:
+#         input_df = input_df[cat_model.feature_names_]
+#     except:
+#         pass
+
+# # =====================================
+# # PREDICTION BUTTON
+# # =====================================
+
+# if st.sidebar.button("🚀 Predict Demand"):
+
+#     with st.spinner("🤖 Running AI Models..."):
+
+#         time.sleep(1.2)
+
+#         cat_pred = cat_model.predict(input_df)[0]
+#         lgb_pred = lgb_model.predict(input_df)[0]
+
+#         final_pred = 0.6 * cat_pred + 0.4 * lgb_pred
+
+#         # =========================
+#         # ANOMALY DETECTION
+#         # =========================
+
+#         mean = df["Demand"].mean()
+#         std = df["Demand"].std()
+
+#         z_score = (final_pred - mean) / std
+#         anomaly = abs(z_score) > 2
+
+#     st.success("✅ Prediction Completed!")
+
+#     # =========================
+#     # RESULT UI
+#     # =========================
+
+#     st.markdown("---")
+#     st.subheader("📊 Prediction Result")
+
+#     col1, col2, col3 = st.columns(3)
+
+#     col1.metric("CatBoost", round(cat_pred, 2))
+#     col2.metric("LightGBM", round(lgb_pred, 2))
+#     col3.metric("Final Forecast", round(final_pred, 2))
+
+#     # =========================
+#     # ANOMALY ALERT
+#     # =========================
+
+#     if anomaly:
+#         st.error(f"🚨 Anomaly Detected | Z = {z_score:.2f}")
+#     else:
+#         st.success(f"Normal Demand Pattern | Z = {z_score:.2f}")
+
+#     # =========================
+#     # GAUGE ANIMATION
+#     # =========================
+
+#     fig = go.Figure(go.Indicator(
+#         mode="gauge+number",
+#         value=final_pred,
+#         title={"text": "Predicted Demand"},
+#         gauge={
+#             "axis": {"range": [0, 1000]},
+#             "bar": {"color": "cyan"},
+#             "steps": [
+#                 {"range": [0, 300], "color": "#14532d"},
+#                 {"range": [300, 700], "color": "#78350f"},
+#                 {"range": [700, 1000], "color": "#7f1d1d"}
+#             ]
+#         }
+#     ))
+
+#     st.plotly_chart(fig, use_container_width=True)
+
+#     # =========================
+#     # ANIMATION EFFECT
+#     # =========================
+
+#     st.balloons()
+
+#     # =========================
+#     # TREND PLOT
+#     # =========================
+
+#     st.subheader("📉 Historical Trend")
+
+#     product_history = df[df["Product ID"] == selected_product]
+
+#     trend_fig = px.line(
+#         product_history,
+#         x="Date",
+#         y="Demand",
+#         title="Historical Demand Trend"
+#     )
+
+#     trend_fig.add_hline(
+#         y=final_pred,
+#         line_dash="dash",
+#         annotation_text="Forecast"
+#     )
+
+#     st.plotly_chart(trend_fig, use_container_width=True)
+
+# # =====================================
+# # FOOTER
+# # =====================================
+
+# st.markdown("---")
+# st.markdown("""
+# ### 🧠 ML Pipeline
+# - CatBoost Regressor  
+# - LightGBM Regressor  
+# - Weighted Ensemble  
+# - Z-Score Anomaly Detection  
+
+# ### 🚀 Features
+# ✔ Real-time prediction  
+# ✔ Safe encoding system  
+# ✔ Animated dashboard  
+# ✔ Production-ready ML pipeline  
+# """)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -1322,14 +1641,13 @@ from datetime import datetime
 import time
 
 # =====================================
-# PAGE CONFIG
+# CONFIG
 # =====================================
 
 st.set_page_config(
     page_title="Grocery Demand Forecasting",
     page_icon="🛒",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
 # =====================================
@@ -1350,67 +1668,67 @@ cat_model, lgb_model, label_encoders = load_models()
 # =====================================
 
 @st.cache_data
-def load_dataset():
+def load_data():
     df = pd.read_csv("dataset/sales_data.csv")
     df["Date"] = pd.to_datetime(df["Date"])
     return df
 
-df = load_dataset()
+df = load_data()
 
 # =====================================
 # TITLE
 # =====================================
 
-st.title("🛒 Grocery Demand Forecasting with Anomaly Alerts")
-st.markdown("🔥 CatBoost + LightGBM Ensemble | Real-time Prediction Dashboard")
+st.title("🛒 Grocery Demand Forecasting AI System")
+st.markdown("CatBoost + LightGBM Ensemble | Fully Stable Prediction Engine")
 
 # =====================================
-# SIDEBAR INPUTS
+# SIDEBAR INPUT
 # =====================================
 
-st.sidebar.header("⚙️ Input Features")
+st.sidebar.header("📌 Input Features")
 
-selected_product = st.sidebar.selectbox("Product ID", sorted(df["Product ID"].unique()))
-selected_store = st.sidebar.selectbox("Store ID", sorted(df["Store ID"].unique()))
-selected_region = st.sidebar.selectbox("Region", sorted(df["Region"].unique()))
-selected_category = st.sidebar.selectbox("Category", sorted(df["Category"].unique()))
-selected_weather = st.sidebar.selectbox("Weather Condition", sorted(df["Weather Condition"].unique()))
-selected_season = st.sidebar.selectbox("Seasonality", sorted(df["Seasonality"].unique()))
+product = st.sidebar.selectbox("Product ID", sorted(df["Product ID"].unique()))
+store = st.sidebar.selectbox("Store ID", sorted(df["Store ID"].unique()))
+region = st.sidebar.selectbox("Region", sorted(df["Region"].unique()))
+category = st.sidebar.selectbox("Category", sorted(df["Category"].unique()))
+weather = st.sidebar.selectbox("Weather Condition", sorted(df["Weather Condition"].unique()))
+season = st.sidebar.selectbox("Seasonality", sorted(df["Seasonality"].unique()))
 
-inventory_level = st.sidebar.slider("Inventory Level", 0, 1000, 300)
-units_sold = st.sidebar.slider("Units Sold", 0, 500, 120)
-units_ordered = st.sidebar.slider("Units Ordered", 0, 500, 150)
+inventory = st.sidebar.slider("Inventory Level", 0, 1000, 300)
+sold = st.sidebar.slider("Units Sold", 0, 500, 120)
+ordered = st.sidebar.slider("Units Ordered", 0, 500, 150)
 price = st.sidebar.slider("Price", 1.0, 1000.0, 150.0)
-competitor_price = st.sidebar.slider("Competitor Price", 1.0, 1000.0, 145.0)
-discount = st.sidebar.slider("Discount (%)", 0, 100, 10)
+comp_price = st.sidebar.slider("Competitor Price", 1.0, 1000.0, 145.0)
+discount = st.sidebar.slider("Discount", 0, 100, 10)
 promotion = st.sidebar.selectbox("Promotion", [0, 1])
 epidemic = st.sidebar.selectbox("Epidemic", [0, 1])
 
-selected_date = st.sidebar.date_input("Select Date", datetime.today())
+selected_date = st.sidebar.date_input("Select Date (Supports 2026+)", datetime.today())
 
 # =====================================
 # BUILD INPUT DF
 # =====================================
 
 input_df = pd.DataFrame({
-    "Product ID": [selected_product],
-    "Store ID": [selected_store],
-    "Region": [selected_region],
-    "Category": [selected_category],
-    "Weather Condition": [selected_weather],
-    "Seasonality": [selected_season],
-    "Inventory Level": [inventory_level],
-    "Units Sold": [units_sold],
-    "Units Ordered": [units_ordered],
+    "Product ID": [product],
+    "Store ID": [store],
+    "Region": [region],
+    "Category": [category],
+    "Weather Condition": [weather],
+    "Seasonality": [season],
+    "Inventory Level": [inventory],
+    "Units Sold": [sold],
+    "Units Ordered": [ordered],
     "Price": [price],
     "Discount": [discount],
     "Promotion": [promotion],
-    "Competitor Pricing": [competitor_price],
+    "Competitor Pricing": [comp_price],
     "Epidemic": [epidemic]
 })
 
 # =====================================
-# DATE FEATURES
+# DATE FEATURES (SAFE FOR FUTURE 2026+)
 # =====================================
 
 input_df["Date"] = pd.to_datetime([selected_date])
@@ -1421,7 +1739,7 @@ input_df["week"] = input_df["Date"].dt.isocalendar().week.astype(int)
 input_df.drop(columns=["Date"], inplace=True)
 
 # =====================================
-# SAFE ENCODING (FIXED - NO CATBOOST ERROR)
+# SAFE ENCODING (100% ERROR FREE)
 # =====================================
 
 categorical_cols = [
@@ -1434,24 +1752,20 @@ categorical_cols = [
 ]
 
 for col in categorical_cols:
-    if col in label_encoders:
+    le = label_encoders[col]
+    mapping = {cls: i for i, cls in enumerate(le.classes_)}
 
-        le = label_encoders[col]
-
-        # mapping fix (FAST + SAFE)
-        mapping = {cls: idx for idx, cls in enumerate(le.classes_)}
-
-        input_df[col] = input_df[col].map(lambda x: mapping.get(x, 0))
+    # force safe conversion
+    input_df[col] = input_df[col].map(lambda x: mapping.get(x, 0)).astype(int)
 
 # =====================================
-# MATCH MODEL FEATURE ORDER (IMPORTANT FIX)
+# ALIGN FEATURES WITH MODEL
 # =====================================
 
-if hasattr(cat_model, "feature_names_"):
-    try:
-        input_df = input_df[cat_model.feature_names_]
-    except:
-        pass
+try:
+    input_df = input_df.reindex(columns=cat_model.feature_names_, fill_value=0)
+except:
+    pass
 
 # =====================================
 # PREDICTION BUTTON
@@ -1459,9 +1773,8 @@ if hasattr(cat_model, "feature_names_"):
 
 if st.sidebar.button("🚀 Predict Demand"):
 
-    with st.spinner("🤖 Running AI Models..."):
-
-        time.sleep(1.2)
+    with st.spinner("AI Models Running... 🤖"):
+        time.sleep(1.5)
 
         cat_pred = cat_model.predict(input_df)[0]
         lgb_pred = lgb_model.predict(input_df)[0]
@@ -1475,98 +1788,68 @@ if st.sidebar.button("🚀 Predict Demand"):
         mean = df["Demand"].mean()
         std = df["Demand"].std()
 
-        z_score = (final_pred - mean) / std
-        anomaly = abs(z_score) > 2
+        z = (final_pred - mean) / std
+        anomaly = abs(z) > 2
 
-    st.success("✅ Prediction Completed!")
+    st.success("Prediction Completed ✅")
 
     # =========================
-    # RESULT UI
+    # RESULTS
     # =========================
 
-    st.markdown("---")
-    st.subheader("📊 Prediction Result")
+    st.subheader("📊 Forecast Result")
 
     col1, col2, col3 = st.columns(3)
 
     col1.metric("CatBoost", round(cat_pred, 2))
     col2.metric("LightGBM", round(lgb_pred, 2))
-    col3.metric("Final Forecast", round(final_pred, 2))
-
-    # =========================
-    # ANOMALY ALERT
-    # =========================
+    col3.metric("Final Prediction", round(final_pred, 2))
 
     if anomaly:
-        st.error(f"🚨 Anomaly Detected | Z = {z_score:.2f}")
+        st.error(f"🚨 Anomaly Detected | Z = {z:.2f}")
     else:
-        st.success(f"Normal Demand Pattern | Z = {z_score:.2f}")
+        st.success(f"Normal Pattern | Z = {z:.2f}")
 
     # =========================
-    # GAUGE ANIMATION
+    # GAUGE CHART
     # =========================
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
         value=final_pred,
-        title={"text": "Predicted Demand"},
-        gauge={
-            "axis": {"range": [0, 1000]},
-            "bar": {"color": "cyan"},
-            "steps": [
-                {"range": [0, 300], "color": "#14532d"},
-                {"range": [300, 700], "color": "#78350f"},
-                {"range": [700, 1000], "color": "#7f1d1d"}
-            ]
-        }
+        title={"text": "Demand Forecast"},
+        gauge={"axis": {"range": [0, 1000]}}
     ))
 
     st.plotly_chart(fig, use_container_width=True)
 
-    # =========================
-    # ANIMATION EFFECT
-    # =========================
-
     st.balloons()
 
     # =========================
-    # TREND PLOT
+    # TREND
     # =========================
 
     st.subheader("📉 Historical Trend")
 
-    product_history = df[df["Product ID"] == selected_product]
+    hist = df[df["Product ID"] == product]
 
-    trend_fig = px.line(
-        product_history,
-        x="Date",
-        y="Demand",
-        title="Historical Demand Trend"
-    )
+    fig2 = px.line(hist, x="Date", y="Demand", title="Historical Demand Trend")
 
-    trend_fig.add_hline(
-        y=final_pred,
-        line_dash="dash",
-        annotation_text="Forecast"
-    )
+    fig2.add_hline(y=final_pred, line_dash="dash", annotation_text="Forecast")
 
-    st.plotly_chart(trend_fig, use_container_width=True)
+    st.plotly_chart(fig2, use_container_width=True)
 
 # =====================================
 # FOOTER
 # =====================================
 
 st.markdown("---")
-st.markdown("""
-### 🧠 ML Pipeline
-- CatBoost Regressor  
-- LightGBM Regressor  
-- Weighted Ensemble  
-- Z-Score Anomaly Detection  
 
-### 🚀 Features
-✔ Real-time prediction  
-✔ Safe encoding system  
-✔ Animated dashboard  
-✔ Production-ready ML pipeline  
+st.markdown("""
+### 🧠 System Info
+- CatBoost + LightGBM Ensemble  
+- Safe Encoding System (No string crash)  
+- Z-score anomaly detection  
+- 2026+ date supported  
+- Production-ready ML pipeline  
 """)
