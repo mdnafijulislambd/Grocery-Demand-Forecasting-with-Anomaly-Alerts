@@ -1,5 +1,3 @@
-<<<<<<< HEAD
-````md
 # Grocery Demand Forecasting with Anomaly Alerts
 
 ## Project Overview
