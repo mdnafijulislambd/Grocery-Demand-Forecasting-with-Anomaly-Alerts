@@ -4772,154 +4772,279 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 import joblib
-from datetime import datetime
 import time
+from datetime import datetime
 
 # =========================================================
-# PAGE CONFIG (PRO UI)
+# PAGE CONFIG
 # =========================================================
+
 st.set_page_config(
-    page_title="Smart Grocery Intelligence",
+    page_title="Smart Grocery Demand Forecasting",
     page_icon="🛒",
     layout="wide"
 )
 
 # =========================================================
-# AMAZON STYLE UI
+# CUSTOM CSS
 # =========================================================
+
 st.markdown("""
 <style>
 
-.header {
-    background: linear-gradient(90deg, #131921, #232F3E);
-    padding: 18px;
-    border-radius: 12px;
-    color: white;
-    font-size: 22px;
-    font-weight: 600;
+.main {
+    background-color: #0E1117;
+}
+
+.metric-card {
+    background-color: #1E1E1E;
+    padding: 20px;
+    border-radius: 16px;
     text-align: center;
-    margin-bottom: 20px;
+    border: 1px solid #2E2E2E;
 }
 
-.card {
-    background: white;
-    padding: 18px;
-    border-radius: 14px;
-    box-shadow: 0px 4px 12px rgba(0,0,0,0.08);
-    text-align: center;
+.metric-title {
+    font-size: 18px;
+    color: #AAAAAA;
 }
 
-.title { font-size: 14px; color: gray; }
-.value { font-size: 26px; font-weight: bold; }
-
-.alert {
-    padding: 14px;
-    border-radius: 10px;
-    font-weight: 600;
+.metric-value {
+    font-size: 32px;
+    font-weight: bold;
+    color: #00FFAA;
 }
-
-.warn { background: #fff4e5; color: #b06000; }
-.safe { background: #e6f4ea; color: #137333; }
 
 </style>
 """, unsafe_allow_html=True)
 
 # =========================================================
-# HEADER
+# LOAD MODELS
 # =========================================================
-st.markdown('<div class="header">🛒 Smart Grocery Demand Intelligence Dashboard</div>', unsafe_allow_html=True)
 
-# =========================================================
-# LOAD DATA + MODELS
-# =========================================================
 @st.cache_resource
 def load_models():
+
     cat_model = joblib.load("models/catboost_model.pkl")
     lgb_model = joblib.load("models/lightgbm_model.pkl")
     label_encoders = joblib.load("models/label_encoders.pkl")
+
     return cat_model, lgb_model, label_encoders
+
+
+cat_model, lgb_model, label_encoders = load_models()
+
+# =========================================================
+# LOAD DATA
+# =========================================================
 
 @st.cache_data
 def load_data():
+
     df = pd.read_csv("dataset/sales_data.csv")
     df["Date"] = pd.to_datetime(df["Date"])
     return df
 
-cat_model, lgb_model, label_encoders = load_models()
+
 df = load_data()
 
 # =========================================================
-# SIDEBAR INPUT
+# DEFAULT SAFE VARIABLES (🔥 FIX FOR YOUR ERROR)
 # =========================================================
-st.sidebar.header("📌 Input Panel")
 
-product = st.sidebar.selectbox("Product", df["Product ID"].astype(str).unique())
-store = st.sidebar.selectbox("Store", df["Store ID"].astype(str).unique())
-region = st.sidebar.selectbox("Region", df["Region"].astype(str).unique())
+final_pred = 0
+confidence = 0
+z = 0
+anomaly = False
+stock_gap = 0
 
-date = st.sidebar.date_input("Date", datetime.today())
+# =========================================================
+# HEADER
+# =========================================================
 
-inventory = st.sidebar.slider("Inventory", 0, 1000, 300)
-sold = st.sidebar.slider("Units Sold", 0, 500, 120)
-price = st.sidebar.slider("Price", 1.0, 1000.0, 150.0)
+st.title("🛒 Smart Grocery Demand Forecasting")
 
-with st.sidebar.expander("Advanced"):
-    category = st.selectbox("Category", df["Category"].astype(str).unique())
-    weather = st.selectbox("Weather", df["Weather Condition"].astype(str).unique())
-    season = st.selectbox("Season", df["Seasonality"].astype(str).unique())
-    ordered = st.slider("Ordered", 0, 500, 150)
+st.markdown("""
+AI-powered grocery demand prediction and anomaly monitoring dashboard.
+""")
+
+# =========================================================
+# SIDEBAR
+# =========================================================
+
+st.sidebar.header("📌 Forecast Configuration")
+
+product = st.sidebar.selectbox(
+    "Product",
+    sorted(df["Product ID"].astype(str).unique())
+)
+
+store = st.sidebar.selectbox(
+    "Store",
+    sorted(df["Store ID"].astype(str).unique())
+)
+
+region = st.sidebar.selectbox(
+    "Region",
+    sorted(df["Region"].astype(str).unique())
+)
+
+selected_date = st.sidebar.date_input(
+    "Forecast Date",
+    datetime.today()
+)
+
+inventory = st.sidebar.slider("Inventory Level", 0, 1000, 300)
+sold = st.sidebar.slider("Recent Units Sold", 0, 500, 120)
+price = st.sidebar.slider("Product Price", 1.0, 1000.0, 150.0)
+
+# =========================================================
+# ADVANCED SETTINGS
+# =========================================================
+
+with st.sidebar.expander("⚙️ Advanced Settings"):
+
+    category = st.selectbox("Category", sorted(df["Category"].astype(str).unique()))
+    weather = st.selectbox("Weather Condition", sorted(df["Weather Condition"].astype(str).unique()))
+    season = st.selectbox("Seasonality", sorted(df["Seasonality"].astype(str).unique()))
+
+    ordered = st.slider("Units Ordered", 0, 500, 150)
     discount = st.slider("Discount", 0, 100, 10)
-    promo = st.selectbox("Promotion", [0,1])
-    epidemic = st.selectbox("Epidemic", [0,1])
+    promotion = st.selectbox("Promotion", [0, 1])
+    epidemic = st.selectbox("Epidemic", [0, 1])
     comp_price = st.slider("Competitor Price", 1.0, 1000.0, 145.0)
 
 # =========================================================
 # INPUT DF
 # =========================================================
+
 input_df = pd.DataFrame({
-    "Product ID":[product],
-    "Store ID":[store],
-    "Region":[region],
-    "Category":[category],
-    "Weather Condition":[weather],
-    "Seasonality":[season],
-    "Inventory Level":[inventory],
-    "Units Sold":[sold],
-    "Units Ordered":[ordered],
-    "Price":[price],
-    "Discount":[discount],
-    "Promotion":[promo],
-    "Competitor Pricing":[comp_price],
-    "Epidemic":[epidemic]
+
+    "Product ID": [product],
+    "Store ID": [store],
+    "Region": [region],
+    "Category": [category],
+    "Weather Condition": [weather],
+    "Seasonality": [season],
+
+    "Inventory Level": [inventory],
+    "Units Sold": [sold],
+    "Units Ordered": [ordered],
+
+    "Price": [price],
+    "Discount": [discount],
+    "Promotion": [promotion],
+    "Competitor Pricing": [comp_price],
+    "Epidemic": [epidemic]
+
 })
 
 # =========================================================
 # DATE FEATURES
 # =========================================================
-input_df["Date"] = pd.to_datetime([date])
+
+input_df["Date"] = pd.to_datetime([selected_date])
 input_df["day"] = input_df["Date"].dt.day
 input_df["month"] = input_df["Date"].dt.month
-input_df["dow"] = input_df["Date"].dt.dayofweek
-input_df["week"] = input_df["Date"].dt.isocalendar().week.astype(int)
+input_df["year"] = input_df["Date"].dt.year
+input_df["day_of_week"] = input_df["Date"].dt.dayofweek
+
+input_df["week_of_year"] = input_df["Date"].dt.isocalendar().week.astype(int)
+input_df["quarter"] = input_df["Date"].dt.quarter
+input_df["is_weekend"] = (input_df["day_of_week"] >= 5).astype(int)
+
+# =========================================================
+# EXTRA FEATURES
+# =========================================================
+
+input_df["is_holiday"] = 0
+input_df["demand_lag_1"] = sold
+input_df["demand_lag_7"] = sold
+input_df["demand_lag_14"] = sold
+input_df["demand_lag_30"] = sold
+
+input_df["rolling_mean_7"] = sold
+input_df["rolling_mean_14"] = sold
+input_df["rolling_mean_30"] = sold
+
+input_df["rolling_std_7"] = 0
+input_df["rolling_std_30"] = 0
+
+input_df["price_diff"] = price - comp_price
+input_df["discounted_price"] = price * (1 - discount / 100)
+input_df["inventory_sales_ratio"] = inventory / (sold + 1)
+
 input_df.drop(columns=["Date"], inplace=True)
 
 # =========================================================
-# SAFE ENCODING (CATBOOST FIX)
+# ENCODING (SAFE)
 # =========================================================
-for col in ["Product ID","Store ID","Region","Category","Weather Condition","Seasonality"]:
-    if col in label_encoders:
-        le = label_encoders[col]
-        mapping = {c:i for i,c in enumerate(le.classes_)}
-        input_df[col] = input_df[col].astype(str).map(lambda x: mapping.get(x,0)).astype(int)
+
+possible_keys = {
+    "Product ID": ["Product ID", "product_id"],
+    "Store ID": ["Store ID", "store_id"],
+    "Region": ["Region", "region"],
+    "Category": ["Category", "category"],
+    "Weather Condition": ["Weather Condition", "weather_condition"],
+    "Seasonality": ["Seasonality", "seasonality"]
+}
+
+for col, keys in possible_keys.items():
+    encoder_found = None
+
+    for key in keys:
+        if key in label_encoders:
+            encoder_found = label_encoders[key]
+            break
+
+    if encoder_found is not None:
+        mapping = {cls: i for i, cls in enumerate(encoder_found.classes_)}
+        input_df[col] = input_df[col].map(lambda x: mapping.get(x, 0)).astype(int)
 
 # =========================================================
 # FEATURE ALIGNMENT
 # =========================================================
+
 try:
     input_df = input_df.reindex(columns=cat_model.feature_names_, fill_value=0)
 except:
@@ -4928,70 +5053,156 @@ except:
 # =========================================================
 # BUTTON
 # =========================================================
-if st.sidebar.button("🚀 Generate Forecast"):
 
-    with st.spinner("AI Processing..."):
-        time.sleep(1)
+predict_button = st.sidebar.button("🚀 Generate Forecast")
 
-        cat_pred = float(cat_model.predict(input_df)[0])
-        lgb_pred = float(lgb_model.predict(input_df)[0])
+# =========================================================
+# MODEL RUN
+# =========================================================
 
-        final_pred = 0.6*cat_pred + 0.4*lgb_pred
+if predict_button:
 
-        # STOCK GAP
-        stock_gap = final_pred - inventory
+    with st.spinner("Running AI Forecast Models..."):
 
-        if stock_gap > 0:
-            recommendation = f"⚠ Increase stock by ~{int(stock_gap)} units"
-            status = "ALERT"
-        else:
-            recommendation = "✅ Stock sufficient"
-            status = "SAFE"
+        time.sleep(1.5)
 
-        # ANOMALY
+        cat_pred = cat_model.predict(input_df)[0]
+        lgb_pred = lgb_model.predict(input_df)[0]
+
+        cat_weight = 1 / 13.79
+        lgb_weight = 1 / 14.25
+        total = cat_weight + lgb_weight
+
+        cat_weight /= total
+        lgb_weight /= total
+
+        final_pred = cat_weight * cat_pred + lgb_weight * lgb_pred
+
+        confidence = max(70, 100 - abs(cat_pred - lgb_pred))
+
         mean = df["Demand"].mean()
         std = df["Demand"].std()
         z = (final_pred - mean) / std
+
         anomaly = abs(z) > 2
 
+        # =====================================================
+        # 🔥 NEW FEATURE: STOCK RECOMMENDATION
+        # =====================================================
+
+        if final_pred > inventory:
+            stock_gap = int(final_pred - inventory)
+        else:
+            stock_gap = 0
+
     # =====================================================
-    # KPI UI (AMAZON STYLE)
+    # KPI
     # =====================================================
-    st.markdown("## 📊 Dashboard Overview")
 
-    c1,c2,c3,c4 = st.columns(4)
+    st.subheader("📊 Forecast Summary")
 
-    c1.markdown(f'<div class="card"><div class="title">Forecast</div><div class="value">{final_pred:.0f}</div></div>', unsafe_allow_html=True)
-    c2.markdown(f'<div class="card"><div class="title">Inventory</div><div class="value">{inventory}</div></div>', unsafe_allow_html=True)
-    c3.markdown(f'<div class="card"><div class="title">Stock Gap</div><div class="value">{int(stock_gap)}</div></div>', unsafe_allow_html=True)
-    c4.markdown(f'<div class="card"><div class="title">Status</div><div class="value">{status}</div></div>', unsafe_allow_html=True)
+    col1, col2, col3, col4, col5 = st.columns(5)
 
-    # ALERT BOX
-    if stock_gap > 0:
-        st.markdown(f'<div class="alert warn">⚠ {recommendation}</div>', unsafe_allow_html=True)
+    with col1:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Forecast Demand</div>
+            <div class="metric-value">{final_pred:.0f}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col2:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Confidence</div>
+            <div class="metric-value">{confidence:.1f}%</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col3:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Inventory</div>
+            <div class="metric-value">{inventory}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    with col4:
+        status = "Alert" if anomaly else "Normal"
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Status</div>
+            <div class="metric-value">{status}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # 🔥 NEW CARD
+    with col5:
+        st.markdown(f"""
+        <div class="metric-card">
+            <div class="metric-title">Stock Needed</div>
+            <div class="metric-value">{stock_gap}</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+    # =====================================================
+    # INSIGHT
+    # =====================================================
+
+    st.subheader("💡 Business Insight")
+
+    if final_pred > inventory:
+        st.error(f"""
+        🚨 Stock Shortage Detected  
+        👉 You need to increase stock by **{stock_gap} units**
+        """)
     else:
-        st.markdown(f'<div class="alert safe">{recommendation}</div>', unsafe_allow_html=True)
+        st.success("Inventory is sufficient for predicted demand.")
+
+    if anomaly:
+        st.warning("Anomaly detected in demand pattern!")
 
     # =====================================================
-    # GAUGE
+    # TABS
     # =====================================================
-    fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=final_pred,
-        title={"text":"Demand Forecast (Units)"},
-        gauge={"axis":{"range":[0,max(1000,int(final_pred+200))]}}
-    ))
 
-    st.plotly_chart(fig, use_container_width=True)
+    tab1, tab2, tab3 = st.tabs([
+        "📈 Forecast",
+        "📉 Historical Trend",
+        "⚙️ Technical Details"
+    ])
 
-    # =====================================================
-    # INSIGHT PANEL
-    # =====================================================
-    st.subheader("📦 Business Insight")
+    with tab1:
 
-    st.info(f"""
-    Forecast: {final_pred:.0f} units  
-    Inventory: {inventory} units  
-    Gap: {int(stock_gap)} units  
-    Recommendation: {recommendation}
-    """)
+        fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=final_pred,
+            title={"text": "Forecasted Demand (Units)"},  # 🔥 units added
+        ))
+
+        st.plotly_chart(fig, use_container_width=True)
+
+        st.info(f"Forecast Units: {final_pred:.0f}")
+
+        if anomaly:
+            st.error(f"Anomaly | Z={z:.2f}")
+        else:
+            st.success(f"Normal | Z={z:.2f}")
+
+    with tab2:
+
+        st.subheader("Historical Demand Trend")
+
+    with tab3:
+
+        st.subheader("Technical Info")
+
+        st.write(f"Forecast: {final_pred:.2f}")
+        st.write(f"Stock Gap: {stock_gap}")
+
+# =========================================================
+# FOOTER
+# =========================================================
+
+st.markdown("---")
+st.markdown("### 🧠 AI Demand Forecasting System")
