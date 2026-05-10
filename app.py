@@ -1630,7 +1630,6 @@
 
 
 
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -1688,82 +1687,246 @@ st.markdown("CatBoost + LightGBM Ensemble | Fully Stable Prediction Engine")
 
 st.sidebar.header("📌 Input Features")
 
-product = st.sidebar.selectbox("Product ID", sorted(df["Product ID"].unique()))
-store = st.sidebar.selectbox("Store ID", sorted(df["Store ID"].unique()))
-region = st.sidebar.selectbox("Region", sorted(df["Region"].unique()))
-category = st.sidebar.selectbox("Category", sorted(df["Category"].unique()))
-weather = st.sidebar.selectbox("Weather Condition", sorted(df["Weather Condition"].unique()))
-season = st.sidebar.selectbox("Seasonality", sorted(df["Seasonality"].unique()))
+product = st.sidebar.selectbox(
+    "Product ID",
+    sorted(df["Product ID"].unique())
+)
 
-inventory = st.sidebar.slider("Inventory Level", 0, 1000, 300)
-sold = st.sidebar.slider("Units Sold", 0, 500, 120)
-ordered = st.sidebar.slider("Units Ordered", 0, 500, 150)
-price = st.sidebar.slider("Price", 1.0, 1000.0, 150.0)
-comp_price = st.sidebar.slider("Competitor Price", 1.0, 1000.0, 145.0)
-discount = st.sidebar.slider("Discount", 0, 100, 10)
-promotion = st.sidebar.selectbox("Promotion", [0, 1])
-epidemic = st.sidebar.selectbox("Epidemic", [0, 1])
+store = st.sidebar.selectbox(
+    "Store ID",
+    sorted(df["Store ID"].unique())
+)
 
-selected_date = st.sidebar.date_input("Select Date (Supports 2026+)", datetime.today())
+region = st.sidebar.selectbox(
+    "Region",
+    sorted(df["Region"].unique())
+)
+
+category = st.sidebar.selectbox(
+    "Category",
+    sorted(df["Category"].unique())
+)
+
+weather = st.sidebar.selectbox(
+    "Weather Condition",
+    sorted(df["Weather Condition"].unique())
+)
+
+season = st.sidebar.selectbox(
+    "Seasonality",
+    sorted(df["Seasonality"].unique())
+)
+
+inventory = st.sidebar.slider(
+    "Inventory Level",
+    0,
+    1000,
+    300
+)
+
+sold = st.sidebar.slider(
+    "Units Sold",
+    0,
+    500,
+    120
+)
+
+ordered = st.sidebar.slider(
+    "Units Ordered",
+    0,
+    500,
+    150
+)
+
+price = st.sidebar.slider(
+    "Price",
+    1.0,
+    1000.0,
+    150.0
+)
+
+comp_price = st.sidebar.slider(
+    "Competitor Price",
+    1.0,
+    1000.0,
+    145.0
+)
+
+discount = st.sidebar.slider(
+    "Discount",
+    0,
+    100,
+    10
+)
+
+promotion = st.sidebar.selectbox(
+    "Promotion",
+    [0, 1]
+)
+
+epidemic = st.sidebar.selectbox(
+    "Epidemic",
+    [0, 1]
+)
+
+selected_date = st.sidebar.date_input(
+    "Select Date (Supports 2026+)",
+    datetime.today()
+)
 
 # =====================================
 # BUILD INPUT DF
 # =====================================
 
 input_df = pd.DataFrame({
-    "Product ID": [product],
-    "Store ID": [store],
-    "Region": [region],
-    "Category": [category],
-    "Weather Condition": [weather],
-    "Seasonality": [season],
-    "Inventory Level": [inventory],
-    "Units Sold": [sold],
-    "Units Ordered": [ordered],
-    "Price": [price],
-    "Discount": [discount],
-    "Promotion": [promotion],
-    "Competitor Pricing": [comp_price],
-    "Epidemic": [epidemic]
+    "product_id": [product],
+    "store_id": [store],
+    "region": [region],
+    "category": [category],
+    "weather_condition": [weather],
+    "seasonality": [season],
+    "inventory_level": [inventory],
+    "units_sold": [sold],
+    "units_ordered": [ordered],
+    "price": [price],
+    "discount": [discount],
+    "promotion": [promotion],
+    "competitor_pricing": [comp_price],
+    "epidemic": [epidemic]
 })
 
 # =====================================
-# DATE FEATURES (SAFE FOR FUTURE 2026+)
+# DATE FEATURES
 # =====================================
 
-input_df["Date"] = pd.to_datetime([selected_date])
-input_df["day"] = input_df["Date"].dt.day
-input_df["month"] = input_df["Date"].dt.month
-input_df["dayofweek"] = input_df["Date"].dt.dayofweek
-input_df["week"] = input_df["Date"].dt.isocalendar().week.astype(int)
-input_df.drop(columns=["Date"], inplace=True)
+input_df["date"] = pd.to_datetime([selected_date])
+
+input_df["day"] = input_df["date"].dt.day
+
+input_df["month"] = input_df["date"].dt.month
+
+input_df["year"] = input_df["date"].dt.year
+
+input_df["day_of_week"] = (
+    input_df["date"].dt.dayofweek
+)
+
+input_df["week_of_year"] = (
+    input_df["date"]
+    .dt
+    .isocalendar()
+    .week
+    .astype(int)
+)
+
+input_df["quarter"] = (
+    input_df["date"]
+    .dt
+    .quarter
+)
+
+input_df["is_weekend"] = (
+    input_df["day_of_week"] >= 5
+).astype(int)
+
+input_df["day_name"] = (
+    input_df["date"]
+    .dt
+    .day_name()
+)
+
+input_df["month_sin"] = np.sin(
+    2 * np.pi * input_df["month"] / 12
+)
+
+input_df["month_cos"] = np.cos(
+    2 * np.pi * input_df["month"] / 12
+)
+
+input_df["dow_sin"] = np.sin(
+    2 * np.pi * input_df["day_of_week"] / 7
+)
+
+input_df["dow_cos"] = np.cos(
+    2 * np.pi * input_df["day_of_week"] / 7
+)
+
+input_df.drop(
+    columns=["date"],
+    inplace=True
+)
 
 # =====================================
-# SAFE ENCODING (100% ERROR FREE)
+# EXTRA FEATURES
+# =====================================
+
+input_df["is_holiday"] = 0
+
+input_df["demand_lag_1"] = sold
+input_df["demand_lag_7"] = sold
+input_df["demand_lag_14"] = sold
+input_df["demand_lag_30"] = sold
+
+input_df["rolling_mean_7"] = sold
+input_df["rolling_mean_14"] = sold
+input_df["rolling_mean_30"] = sold
+
+input_df["rolling_std_7"] = 0
+input_df["rolling_std_30"] = 0
+
+input_df["expanding_mean"] = sold
+
+input_df["demand_change_1"] = 0
+input_df["demand_change_7"] = 0
+
+input_df["price_diff"] = (
+    price - comp_price
+)
+
+input_df["discounted_price"] = (
+    price * (1 - discount / 100)
+)
+
+input_df["inventory_sales_ratio"] = (
+    inventory / (sold + 1)
+)
+
+# =====================================
+# SAFE ENCODING
 # =====================================
 
 categorical_cols = [
-    "Product ID",
-    "Store ID",
-    "Region",
-    "Category",
-    "Weather Condition",
-    "Seasonality"
+    "product_id",
+    "store_id",
+    "region",
+    "category",
+    "weather_condition",
+    "seasonality",
+    "day_name"
 ]
 
 for col in categorical_cols:
-    le = label_encoders[col]
-    mapping = {cls: i for i, cls in enumerate(le.classes_)}
 
-    # force safe conversion
-    input_df[col] = input_df[col].map(lambda x: mapping.get(x, 0)).astype(int)
+    le = label_encoders[col]
+
+    mapping = {
+        cls: i
+        for i, cls in enumerate(le.classes_)
+    }
+
+    input_df[col] = input_df[col].map(
+        lambda x: mapping.get(x, 0)
+    ).astype(int)
 
 # =====================================
-# ALIGN FEATURES WITH MODEL
+# ALIGN FEATURES
 # =====================================
 
 try:
-    input_df = input_df.reindex(columns=cat_model.feature_names_, fill_value=0)
+    input_df = input_df.reindex(
+        columns=cat_model.feature_names_,
+        fill_value=0
+    )
 except:
     pass
 
@@ -1774,21 +1937,42 @@ except:
 if st.sidebar.button("🚀 Predict Demand"):
 
     with st.spinner("AI Models Running... 🤖"):
+
         time.sleep(1.5)
 
-        cat_pred = cat_model.predict(input_df)[0]
-        lgb_pred = lgb_model.predict(input_df)[0]
+        cat_pred = cat_model.predict(
+            input_df
+        )[0]
 
-        final_pred = 0.6 * cat_pred + 0.4 * lgb_pred
+        lgb_pred = lgb_model.predict(
+            input_df
+        )[0]
+
+        cat_weight = 1 / 13.79
+        lgb_weight = 1 / 14.25
+
+        total = cat_weight + lgb_weight
+
+        cat_weight /= total
+        lgb_weight /= total
+
+        final_pred = (
+            cat_weight * cat_pred +
+            lgb_weight * lgb_pred
+        )
 
         # =========================
         # ANOMALY DETECTION
         # =========================
 
         mean = df["Demand"].mean()
+
         std = df["Demand"].std()
 
-        z = (final_pred - mean) / std
+        z = (
+            final_pred - mean
+        ) / std
+
         anomaly = abs(z) > 2
 
     st.success("Prediction Completed ✅")
@@ -1801,14 +1985,32 @@ if st.sidebar.button("🚀 Predict Demand"):
 
     col1, col2, col3 = st.columns(3)
 
-    col1.metric("CatBoost", round(cat_pred, 2))
-    col2.metric("LightGBM", round(lgb_pred, 2))
-    col3.metric("Final Prediction", round(final_pred, 2))
+    col1.metric(
+        "CatBoost",
+        round(cat_pred, 2)
+    )
+
+    col2.metric(
+        "LightGBM",
+        round(lgb_pred, 2)
+    )
+
+    col3.metric(
+        "Final Prediction",
+        round(final_pred, 2)
+    )
 
     if anomaly:
-        st.error(f"🚨 Anomaly Detected | Z = {z:.2f}")
+
+        st.error(
+            f"🚨 Anomaly Detected | Z = {z:.2f}"
+        )
+
     else:
-        st.success(f"Normal Pattern | Z = {z:.2f}")
+
+        st.success(
+            f"Normal Pattern | Z = {z:.2f}"
+        )
 
     # =========================
     # GAUGE CHART
@@ -1818,26 +2020,47 @@ if st.sidebar.button("🚀 Predict Demand"):
         mode="gauge+number",
         value=final_pred,
         title={"text": "Demand Forecast"},
-        gauge={"axis": {"range": [0, 1000]}}
+        gauge={
+            "axis": {
+                "range": [0, 1000]
+            }
+        }
     ))
 
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
 
     st.balloons()
 
     # =========================
-    # TREND
+    # HISTORICAL TREND
     # =========================
 
     st.subheader("📉 Historical Trend")
 
-    hist = df[df["Product ID"] == product]
+    hist = df[
+        df["Product ID"] == product
+    ]
 
-    fig2 = px.line(hist, x="Date", y="Demand", title="Historical Demand Trend")
+    fig2 = px.line(
+        hist,
+        x="Date",
+        y="Demand",
+        title="Historical Demand Trend"
+    )
 
-    fig2.add_hline(y=final_pred, line_dash="dash", annotation_text="Forecast")
+    fig2.add_hline(
+        y=final_pred,
+        line_dash="dash",
+        annotation_text="Forecast"
+    )
 
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(
+        fig2,
+        use_container_width=True
+    )
 
 # =====================================
 # FOOTER
@@ -1847,9 +2070,11 @@ st.markdown("---")
 
 st.markdown("""
 ### 🧠 System Info
+
 - CatBoost + LightGBM Ensemble  
-- Safe Encoding System (No string crash)  
+- Dynamic Weighted Prediction  
+- Safe Encoding System  
 - Z-score anomaly detection  
-- 2026+ date supported  
+- 2026+ future forecasting support  
 - Production-ready ML pipeline  
 """)
