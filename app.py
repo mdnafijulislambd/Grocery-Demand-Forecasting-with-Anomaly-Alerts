@@ -2771,32 +2771,151 @@ if st.sidebar.button("🚀 Generate Forecast"):
     # =====================================================
     # TREND TAB
     # =====================================================
+with tab2:
 
-    with tab2:
+    st.subheader(
+        "Historical Demand Trend"
+    )
+
+    hist = df[
+        df["Product ID"] == product
+    ].copy()
+
+    # =====================================
+    # SIMPLE ANOMALY DETECTION
+    # =====================================
+
+    mean_demand = hist["Demand"].mean()
+
+    std_demand = hist["Demand"].std()
+
+    hist["z_score"] = (
+        hist["Demand"] - mean_demand
+    ) / std_demand
+
+    hist["anomaly"] = (
+        hist["z_score"].abs() > 2
+    )
+
+    anomaly_points = hist[
+        hist["anomaly"] == True
+    ]
+
+    # =====================================
+    # MAIN LINE CHART
+    # =====================================
+
+    fig2 = go.Figure()
+
+    fig2.add_trace(
+
+        go.Scatter(
+
+            x=hist["Date"],
+            y=hist["Demand"],
+
+            mode="lines",
+
+            name="Historical Demand",
+
+            line=dict(width=3)
+
+        )
+
+    )
+
+    # =====================================
+    # FORECAST LINE
+    # =====================================
+
+    fig2.add_hline(
+
+        y=final_pred,
+
+        line_dash="dash",
+
+        annotation_text="Forecast"
+
+    )
+
+    # =====================================
+    # ANOMALY RED DOTS
+    # =====================================
+
+    fig2.add_trace(
+
+        go.Scatter(
+
+            x=anomaly_points["Date"],
+
+            y=anomaly_points["Demand"],
+
+            mode="markers",
+
+            name="Anomaly",
+
+            marker=dict(
+
+                color="red",
+
+                size=10,
+
+                symbol="circle"
+
+            )
+
+        )
+
+    )
+
+    # =====================================
+    # LAYOUT
+    # =====================================
+
+    fig2.update_layout(
+
+        title="Demand Trend with Anomaly Alerts",
+
+        xaxis_title="Date",
+
+        yaxis_title="Demand",
+
+        hovermode="x unified",
+
+        height=550
+
+    )
+
+    st.plotly_chart(
+
+        fig2,
+
+        use_container_width=True
+
+    )
+
+    # =====================================
+    # ANOMALY TABLE
+    # =====================================
+
+    if len(anomaly_points) > 0:
 
         st.subheader(
-            "Historical Demand Trend"
+            "🚨 Detected Anomalies"
         )
 
-        hist = df[
-            df["Product ID"] == product
-        ]
+        st.dataframe(
 
-        fig2 = px.line(
-            hist,
-            x="Date",
-            y="Demand"
-        )
+            anomaly_points[
+                [
+                    "Date",
+                    "Demand",
+                    "z_score"
+                ]
+            ],
 
-        fig2.add_hline(
-            y=final_pred,
-            line_dash="dash",
-            annotation_text="Forecast"
-        )
-
-        st.plotly_chart(
-            fig2,
             use_container_width=True
+
         )
 
     # =====================================================
