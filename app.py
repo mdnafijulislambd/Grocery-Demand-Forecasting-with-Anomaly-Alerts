@@ -2737,22 +2737,26 @@ if st.sidebar.button("🚀 Generate Forecast"):
     #     "⚙️ Technical Details"
     # ])
 
-    tab1, tab2, tab3 = st.tabs([
+  # =====================================================
+# TABS
+# =====================================================
+
+tab1, tab2, tab3 = st.tabs([
     "📈 Forecast",
     "📉 Historical Trend",
     "⚙️ Technical Details"
-    ])
+])
 
+# =====================================================
+# FORECAST TAB
+# =====================================================
 
-    # =====================================================
-    # FORECAST TAB
-    # =====================================================
+with tab1:
 
-    with tab1:
+    st.subheader("Forecast Visualization")
 
-        st.subheader("Forecast Visualization")
-
-        fig = go.Figure(go.Indicator(
+    fig = go.Figure(
+        go.Indicator(
 
             mode="gauge+number",
 
@@ -2765,19 +2769,60 @@ if st.sidebar.button("🚀 Generate Forecast"):
             gauge={
                 "axis": {
                     "range": [0, 1000]
-                }
+                },
+
+                "bar": {
+                    "color": "cyan"
+                },
+
+                "steps": [
+                    {
+                        "range": [0, 300],
+                        "color": "#14532d"
+                    },
+
+                    {
+                        "range": [300, 700],
+                        "color": "#78350f"
+                    },
+
+                    {
+                        "range": [700, 1000],
+                        "color": "#7f1d1d"
+                    }
+                ]
             }
+        )
+    )
 
-        ))
+    fig.update_layout(
+        height=500
+    )
 
-        st.plotly_chart(
-            fig,
-            use_container_width=True
+    st.plotly_chart(
+        fig,
+        use_container_width=True
+    )
+
+    st.metric(
+        "Final Ensemble Forecast",
+        f"{final_pred:.2f}"
+    )
+
+    if anomaly:
+        st.error(
+            f"🚨 Anomaly Detected | Z-Score = {z:.2f}"
         )
 
-    # =====================================================
-    # TREND TAB
-    # =====================================================
+    else:
+        st.success(
+            f"✅ Normal Demand Pattern | Z-Score = {z:.2f}"
+        )
+
+# =====================================================
+# TREND TAB
+# =====================================================
+
 with tab2:
 
     st.subheader(
@@ -2809,31 +2854,34 @@ with tab2:
     ]
 
     # =====================================
-    # MAIN LINE CHART
+    # MAIN TREND CHART
     # =====================================
 
     fig2 = go.Figure()
+
+    # DEMAND LINE
 
     fig2.add_trace(
 
         go.Scatter(
 
             x=hist["Date"],
+
             y=hist["Demand"],
 
             mode="lines",
 
             name="Historical Demand",
 
-            line=dict(width=3)
+            line=dict(
+                width=3
+            )
 
         )
 
     )
 
-    # =====================================
     # FORECAST LINE
-    # =====================================
 
     fig2.add_hline(
 
@@ -2845,9 +2893,7 @@ with tab2:
 
     )
 
-    # =====================================
-    # ANOMALY RED DOTS
-    # =====================================
+    # ANOMALY POINTS
 
     fig2.add_trace(
 
@@ -2874,10 +2920,6 @@ with tab2:
         )
 
     )
-
-    # =====================================
-    # LAYOUT
-    # =====================================
 
     fig2.update_layout(
 
@@ -2925,54 +2967,65 @@ with tab2:
 
         )
 
-    # =====================================================
-    # TECHNICAL TAB
-    # =====================================================
+    else:
 
-    with tab3:
-
-        st.subheader(
-            "Model Technical Information"
+        st.success(
+            "No historical anomalies detected."
         )
 
-        tech_df = pd.DataFrame({
+# =====================================================
+# TECHNICAL TAB
+# =====================================================
 
-            "Model": [
-                "CatBoost",
-                "LightGBM"
-            ],
+with tab3:
 
-            "Prediction": [
-                round(cat_pred, 2),
-                round(lgb_pred, 2)
-            ]
+    st.subheader(
+        "Model Technical Information"
+    )
 
-        })
+    tech_df = pd.DataFrame({
 
-        st.dataframe(
-            tech_df,
-            use_container_width=True
-        )
+        "Model": [
+            "CatBoost",
+            "LightGBM"
+        ],
 
-        st.write(
-            f"Z-Score: {z:.2f}"
-        )
+        "Prediction": [
+            round(cat_pred, 2),
+            round(lgb_pred, 2)
+        ]
 
-        st.write(
-            f"Ensemble Confidence: {confidence:.2f}%"
-        )
+    })
 
-        st.write(
-            f"Anomaly Status: {anomaly}"
-        )
+    st.dataframe(
+        tech_df,
+        use_container_width=True
+    )
 
-# =========================================================
+    st.write(
+        f"📌 Z-Score: {z:.2f}"
+    )
+
+    st.write(
+        f"📌 Ensemble Confidence: {confidence:.2f}%"
+    )
+
+    st.write(
+        f"📌 Anomaly Status: {anomaly}"
+    )
+
+    st.write(
+        f"📌 Forecast Value: {final_pred:.2f}"
+    )
+
+# =====================================================
 # FOOTER
-# =========================================================
+# =====================================================
 
 st.markdown("---")
 
 st.markdown("""
+
 ### 🧠 System Features
 
 - AI-Powered Demand Forecasting
