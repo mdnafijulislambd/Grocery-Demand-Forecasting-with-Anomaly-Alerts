@@ -1615,21 +1615,6 @@
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -1901,8 +1886,7 @@ categorical_cols = [
     "region",
     "category",
     "weather_condition",
-    "seasonality",
-    "day_name"
+    "seasonality"
 ]
 
 for col in categorical_cols:
@@ -1917,6 +1901,24 @@ for col in categorical_cols:
     input_df[col] = input_df[col].map(
         lambda x: mapping.get(x, 0)
     ).astype(int)
+
+# =====================================
+# MANUAL DAY ENCODING
+# =====================================
+
+day_mapping = {
+    "Monday": 0,
+    "Tuesday": 1,
+    "Wednesday": 2,
+    "Thursday": 3,
+    "Friday": 4,
+    "Saturday": 5,
+    "Sunday": 6
+}
+
+input_df["day_name"] = input_df["day_name"].map(
+    day_mapping
+).fillna(0).astype(int)
 
 # =====================================
 # ALIGN FEATURES
