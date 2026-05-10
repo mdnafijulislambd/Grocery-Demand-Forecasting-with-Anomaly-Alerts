@@ -2731,11 +2731,18 @@ if st.sidebar.button("🚀 Generate Forecast"):
     # TABS
     # =====================================================
 
+    # tab1, tab2, tab3 = st.tabs([
+    #     "📈 Forecast",
+    #     "📉 Historical Trend",
+    #     "⚙️ Technical Details"
+    # ])
+
     tab1, tab2, tab3 = st.tabs([
-        "📈 Forecast",
-        "📉 Historical Trend",
-        "⚙️ Technical Details"
+    "📈 Forecast",
+    "📉 Historical Trend",
+    "⚙️ Technical Details"
     ])
+
 
     # =====================================================
     # FORECAST TAB
