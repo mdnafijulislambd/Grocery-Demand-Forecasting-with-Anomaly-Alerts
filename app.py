@@ -4806,11 +4806,480 @@
 
 
 
+# import streamlit as st
+# import pandas as pd
+# import numpy as np
+# import plotly.graph_objects as go
+# import plotly.express as px
+# import joblib
+# import time
+# from datetime import datetime
+
+# # =========================================================
+# # PAGE CONFIG
+# # =========================================================
+
+# st.set_page_config(
+#     page_title="Smart Grocery Demand Forecasting",
+#     page_icon="🛒",
+#     layout="wide"
+# )
+
+# # =========================================================
+# # CUSTOM CSS
+# # =========================================================
+
+# st.markdown("""
+# <style>
+
+# .main {
+#     background-color: #0E1117;
+# }
+
+# .metric-card {
+#     background-color: #1E1E1E;
+#     padding: 20px;
+#     border-radius: 16px;
+#     text-align: center;
+#     border: 1px solid #2E2E2E;
+# }
+
+# .metric-title {
+#     font-size: 18px;
+#     color: #AAAAAA;
+# }
+
+# .metric-value {
+#     font-size: 32px;
+#     font-weight: bold;
+#     color: #00FFAA;
+# }
+
+# </style>
+# """, unsafe_allow_html=True)
+
+# # =========================================================
+# # LOAD MODELS
+# # =========================================================
+
+# @st.cache_resource
+# def load_models():
+
+#     cat_model = joblib.load("models/catboost_model.pkl")
+#     lgb_model = joblib.load("models/lightgbm_model.pkl")
+#     label_encoders = joblib.load("models/label_encoders.pkl")
+
+#     return cat_model, lgb_model, label_encoders
+
+
+# cat_model, lgb_model, label_encoders = load_models()
+
+# # =========================================================
+# # LOAD DATA
+# # =========================================================
+
+# @st.cache_data
+# def load_data():
+
+#     df = pd.read_csv("dataset/sales_data.csv")
+#     df["Date"] = pd.to_datetime(df["Date"])
+#     return df
+
+
+# df = load_data()
+
+# # =========================================================
+# # DEFAULT SAFE VARIABLES (🔥 FIX FOR YOUR ERROR)
+# # =========================================================
+
+# final_pred = 0
+# confidence = 0
+# z = 0
+# anomaly = False
+# stock_gap = 0
+
+# # =========================================================
+# # HEADER
+# # =========================================================
+
+# st.title("🛒 Smart Grocery Demand Forecasting")
+
+# st.markdown("""
+# AI-powered grocery demand prediction and anomaly monitoring dashboard.
+# """)
+
+# # =========================================================
+# # SIDEBAR
+# # =========================================================
+
+# st.sidebar.header("📌 Forecast Configuration")
+
+# product = st.sidebar.selectbox(
+#     "Product",
+#     sorted(df["Product ID"].astype(str).unique())
+# )
+
+# store = st.sidebar.selectbox(
+#     "Store",
+#     sorted(df["Store ID"].astype(str).unique())
+# )
+
+# region = st.sidebar.selectbox(
+#     "Region",
+#     sorted(df["Region"].astype(str).unique())
+# )
+
+# selected_date = st.sidebar.date_input(
+#     "Forecast Date",
+#     datetime.today()
+# )
+
+# inventory = st.sidebar.slider("Inventory Level", 0, 1000, 300)
+# sold = st.sidebar.slider("Recent Units Sold", 0, 500, 120)
+# price = st.sidebar.slider("Product Price", 1.0, 1000.0, 150.0)
+
+# # =========================================================
+# # ADVANCED SETTINGS
+# # =========================================================
+
+# with st.sidebar.expander("⚙️ Advanced Settings"):
+
+#     category = st.selectbox("Category", sorted(df["Category"].astype(str).unique()))
+#     weather = st.selectbox("Weather Condition", sorted(df["Weather Condition"].astype(str).unique()))
+#     season = st.selectbox("Seasonality", sorted(df["Seasonality"].astype(str).unique()))
+
+#     ordered = st.slider("Units Ordered", 0, 500, 150)
+#     discount = st.slider("Discount", 0, 100, 10)
+#     promotion = st.selectbox("Promotion", [0, 1])
+#     epidemic = st.selectbox("Epidemic", [0, 1])
+#     comp_price = st.slider("Competitor Price", 1.0, 1000.0, 145.0)
+
+# # =========================================================
+# # INPUT DF
+# # =========================================================
+
+# input_df = pd.DataFrame({
+
+#     "Product ID": [product],
+#     "Store ID": [store],
+#     "Region": [region],
+#     "Category": [category],
+#     "Weather Condition": [weather],
+#     "Seasonality": [season],
+
+#     "Inventory Level": [inventory],
+#     "Units Sold": [sold],
+#     "Units Ordered": [ordered],
+
+#     "Price": [price],
+#     "Discount": [discount],
+#     "Promotion": [promotion],
+#     "Competitor Pricing": [comp_price],
+#     "Epidemic": [epidemic]
+
+# })
+
+# # =========================================================
+# # DATE FEATURES
+# # =========================================================
+
+# input_df["Date"] = pd.to_datetime([selected_date])
+# input_df["day"] = input_df["Date"].dt.day
+# input_df["month"] = input_df["Date"].dt.month
+# input_df["year"] = input_df["Date"].dt.year
+# input_df["day_of_week"] = input_df["Date"].dt.dayofweek
+
+# input_df["week_of_year"] = input_df["Date"].dt.isocalendar().week.astype(int)
+# input_df["quarter"] = input_df["Date"].dt.quarter
+# input_df["is_weekend"] = (input_df["day_of_week"] >= 5).astype(int)
+
+# # =========================================================
+# # EXTRA FEATURES
+# # =========================================================
+
+# input_df["is_holiday"] = 0
+# input_df["demand_lag_1"] = sold
+# input_df["demand_lag_7"] = sold
+# input_df["demand_lag_14"] = sold
+# input_df["demand_lag_30"] = sold
+
+# input_df["rolling_mean_7"] = sold
+# input_df["rolling_mean_14"] = sold
+# input_df["rolling_mean_30"] = sold
+
+# input_df["rolling_std_7"] = 0
+# input_df["rolling_std_30"] = 0
+
+# input_df["price_diff"] = price - comp_price
+# input_df["discounted_price"] = price * (1 - discount / 100)
+# input_df["inventory_sales_ratio"] = inventory / (sold + 1)
+
+# input_df.drop(columns=["Date"], inplace=True)
+
+# # =========================================================
+# # ENCODING (SAFE)
+# # =========================================================
+
+# possible_keys = {
+#     "Product ID": ["Product ID", "product_id"],
+#     "Store ID": ["Store ID", "store_id"],
+#     "Region": ["Region", "region"],
+#     "Category": ["Category", "category"],
+#     "Weather Condition": ["Weather Condition", "weather_condition"],
+#     "Seasonality": ["Seasonality", "seasonality"]
+# }
+
+# for col, keys in possible_keys.items():
+#     encoder_found = None
+
+#     for key in keys:
+#         if key in label_encoders:
+#             encoder_found = label_encoders[key]
+#             break
+
+#     if encoder_found is not None:
+#         mapping = {cls: i for i, cls in enumerate(encoder_found.classes_)}
+#         input_df[col] = input_df[col].map(lambda x: mapping.get(x, 0)).astype(int)
+
+# # =========================================================
+# # FEATURE ALIGNMENT
+# # =========================================================
+
+# try:
+#     input_df = input_df.reindex(columns=cat_model.feature_names_, fill_value=0)
+# except:
+#     pass
+
+# # =========================================================
+# # BUTTON
+# # =========================================================
+
+# predict_button = st.sidebar.button("🚀 Generate Forecast")
+
+# # =========================================================
+# # MODEL RUN
+# # =========================================================
+
+# if predict_button:
+
+#     with st.spinner("Running AI Forecast Models..."):
+
+#         time.sleep(1.5)
+
+#         cat_pred = cat_model.predict(input_df)[0]
+#         lgb_pred = lgb_model.predict(input_df)[0]
+
+#         cat_weight = 1 / 13.79
+#         lgb_weight = 1 / 14.25
+#         total = cat_weight + lgb_weight
+
+#         cat_weight /= total
+#         lgb_weight /= total
+
+#         final_pred = cat_weight * cat_pred + lgb_weight * lgb_pred
+
+#         confidence = max(70, 100 - abs(cat_pred - lgb_pred))
+
+#         mean = df["Demand"].mean()
+#         std = df["Demand"].std()
+#         z = (final_pred - mean) / std
+
+#         anomaly = abs(z) > 2
+
+#         # =====================================================
+#         # 🔥 NEW FEATURE: STOCK RECOMMENDATION
+#         # =====================================================
+
+#         if final_pred > inventory:
+#             stock_gap = int(final_pred - inventory)
+#         else:
+#             stock_gap = 0
+
+#     # =====================================================
+#     # KPI
+#     # =====================================================
+
+#     st.subheader("📊 Forecast Summary")
+
+#     col1, col2, col3, col4, col5 = st.columns(5)
+
+#     with col1:
+#         st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-title">Forecast Demand</div>
+#             <div class="metric-value">{final_pred:.0f}</div>
+#         </div>
+#         """, unsafe_allow_html=True)
+
+#     with col2:
+#         st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-title">Confidence</div>
+#             <div class="metric-value">{confidence:.1f}%</div>
+#         </div>
+#         """, unsafe_allow_html=True)
+
+#     with col3:
+#         st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-title">Inventory</div>
+#             <div class="metric-value">{inventory}</div>
+#         </div>
+#         """, unsafe_allow_html=True)
+
+#     with col4:
+#         status = "Alert" if anomaly else "Normal"
+#         st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-title">Status</div>
+#             <div class="metric-value">{status}</div>
+#         </div>
+#         """, unsafe_allow_html=True)
+
+#     # 🔥 NEW CARD
+#     with col5:
+#         st.markdown(f"""
+#         <div class="metric-card">
+#             <div class="metric-title">Stock Needed</div>
+#             <div class="metric-value">{stock_gap}</div>
+#         </div>
+#         """, unsafe_allow_html=True)
+
+#     # =====================================================
+#     # INSIGHT
+#     # =====================================================
+
+#     st.subheader("💡 Business Insight")
+
+#     if final_pred > inventory:
+#         st.error(f"""
+#         🚨 Stock Shortage Detected  
+#         👉 You need to increase stock by **{stock_gap} units**
+#         """)
+#     else:
+#         st.success("Inventory is sufficient for predicted demand.")
+
+#     if anomaly:
+#         st.warning("Anomaly detected in demand pattern!")
+
+#     # =====================================================
+#     # TABS
+#     # =====================================================
+
+#     tab1, tab2, tab3 = st.tabs([
+#         "📈 Forecast",
+#         "📉 Historical Trend",
+#         "⚙️ Technical Details"
+#     ])
+
+#     with tab1:
+
+#         fig = go.Figure(go.Indicator(
+#             mode="gauge+number",
+#             value=final_pred,
+#             title={"text": "Forecasted Demand (Units)"},  # 🔥 units added
+#         ))
+
+#         st.plotly_chart(fig, use_container_width=True)
+
+#         st.info(f"Forecast Units: {final_pred:.0f}")
+
+#         if anomaly:
+#             st.error(f"Anomaly | Z={z:.2f}")
+#         else:
+#             st.success(f"Normal | Z={z:.2f}")
+
+#     with tab2:
+
+#         st.subheader("Historical Demand Trend")
+
+#     with tab3:
+
+#         st.subheader("Technical Info")
+
+#         st.write(f"Forecast: {final_pred:.2f}")
+#         st.write(f"Stock Gap: {stock_gap}")
+
+# # =========================================================
+# # FOOTER
+# # =========================================================
+
+# st.markdown("---")
+# st.markdown("### 🧠 AI Demand Forecasting System")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
-import plotly.express as px
 import joblib
 import time
 from datetime import datetime
@@ -4826,15 +5295,12 @@ st.set_page_config(
 )
 
 # =========================================================
-# CUSTOM CSS
+# CSS (UNCHANGED)
 # =========================================================
 
 st.markdown("""
 <style>
-
-.main {
-    background-color: #0E1117;
-}
+.main { background-color: #0E1117; }
 
 .metric-card {
     background-color: #1E1E1E;
@@ -4844,17 +5310,13 @@ st.markdown("""
     border: 1px solid #2E2E2E;
 }
 
-.metric-title {
-    font-size: 18px;
-    color: #AAAAAA;
-}
+.metric-title { font-size: 18px; color: #AAAAAA; }
 
 .metric-value {
     font-size: 32px;
     font-weight: bold;
     color: #00FFAA;
 }
-
 </style>
 """, unsafe_allow_html=True)
 
@@ -4864,13 +5326,10 @@ st.markdown("""
 
 @st.cache_resource
 def load_models():
-
     cat_model = joblib.load("models/catboost_model.pkl")
     lgb_model = joblib.load("models/lightgbm_model.pkl")
     label_encoders = joblib.load("models/label_encoders.pkl")
-
     return cat_model, lgb_model, label_encoders
-
 
 cat_model, lgb_model, label_encoders = load_models()
 
@@ -4880,16 +5339,14 @@ cat_model, lgb_model, label_encoders = load_models()
 
 @st.cache_data
 def load_data():
-
     df = pd.read_csv("dataset/sales_data.csv")
     df["Date"] = pd.to_datetime(df["Date"])
     return df
 
-
 df = load_data()
 
 # =========================================================
-# DEFAULT SAFE VARIABLES (🔥 FIX FOR YOUR ERROR)
+# DEFAULT SAFE VARIABLES
 # =========================================================
 
 final_pred = 0
@@ -4904,50 +5361,25 @@ stock_gap = 0
 
 st.title("🛒 Smart Grocery Demand Forecasting")
 
-st.markdown("""
-AI-powered grocery demand prediction and anomaly monitoring dashboard.
-""")
-
 # =========================================================
-# SIDEBAR
+# SIDEBAR (UNCHANGED)
 # =========================================================
 
 st.sidebar.header("📌 Forecast Configuration")
 
-product = st.sidebar.selectbox(
-    "Product",
-    sorted(df["Product ID"].astype(str).unique())
-)
-
-store = st.sidebar.selectbox(
-    "Store",
-    sorted(df["Store ID"].astype(str).unique())
-)
-
-region = st.sidebar.selectbox(
-    "Region",
-    sorted(df["Region"].astype(str).unique())
-)
-
-selected_date = st.sidebar.date_input(
-    "Forecast Date",
-    datetime.today()
-)
+product = st.sidebar.selectbox("Product", sorted(df["Product ID"].astype(str).unique()))
+store = st.sidebar.selectbox("Store", sorted(df["Store ID"].astype(str).unique()))
+region = st.sidebar.selectbox("Region", sorted(df["Region"].astype(str).unique()))
+selected_date = st.sidebar.date_input("Forecast Date", datetime.today())
 
 inventory = st.sidebar.slider("Inventory Level", 0, 1000, 300)
 sold = st.sidebar.slider("Recent Units Sold", 0, 500, 120)
 price = st.sidebar.slider("Product Price", 1.0, 1000.0, 150.0)
 
-# =========================================================
-# ADVANCED SETTINGS
-# =========================================================
-
 with st.sidebar.expander("⚙️ Advanced Settings"):
-
     category = st.selectbox("Category", sorted(df["Category"].astype(str).unique()))
     weather = st.selectbox("Weather Condition", sorted(df["Weather Condition"].astype(str).unique()))
     season = st.selectbox("Seasonality", sorted(df["Seasonality"].astype(str).unique()))
-
     ordered = st.slider("Units Ordered", 0, 500, 150)
     discount = st.slider("Discount", 0, 100, 10)
     promotion = st.selectbox("Promotion", [0, 1])
@@ -4955,11 +5387,10 @@ with st.sidebar.expander("⚙️ Advanced Settings"):
     comp_price = st.slider("Competitor Price", 1.0, 1000.0, 145.0)
 
 # =========================================================
-# INPUT DF
+# INPUT DF (UNCHANGED)
 # =========================================================
 
 input_df = pd.DataFrame({
-
     "Product ID": [product],
     "Store ID": [store],
     "Region": [region],
@@ -4976,26 +5407,17 @@ input_df = pd.DataFrame({
     "Promotion": [promotion],
     "Competitor Pricing": [comp_price],
     "Epidemic": [epidemic]
-
 })
 
-# =========================================================
-# DATE FEATURES
-# =========================================================
-
 input_df["Date"] = pd.to_datetime([selected_date])
+
 input_df["day"] = input_df["Date"].dt.day
 input_df["month"] = input_df["Date"].dt.month
 input_df["year"] = input_df["Date"].dt.year
 input_df["day_of_week"] = input_df["Date"].dt.dayofweek
-
 input_df["week_of_year"] = input_df["Date"].dt.isocalendar().week.astype(int)
 input_df["quarter"] = input_df["Date"].dt.quarter
 input_df["is_weekend"] = (input_df["day_of_week"] >= 5).astype(int)
-
-# =========================================================
-# EXTRA FEATURES
-# =========================================================
 
 input_df["is_holiday"] = 0
 input_df["demand_lag_1"] = sold
@@ -5017,7 +5439,7 @@ input_df["inventory_sales_ratio"] = inventory / (sold + 1)
 input_df.drop(columns=["Date"], inplace=True)
 
 # =========================================================
-# ENCODING (SAFE)
+# ENCODING (UNCHANGED)
 # =========================================================
 
 possible_keys = {
@@ -5041,10 +5463,6 @@ for col, keys in possible_keys.items():
         mapping = {cls: i for i, cls in enumerate(encoder_found.classes_)}
         input_df[col] = input_df[col].map(lambda x: mapping.get(x, 0)).astype(int)
 
-# =========================================================
-# FEATURE ALIGNMENT
-# =========================================================
-
 try:
     input_df = input_df.reindex(columns=cat_model.feature_names_, fill_value=0)
 except:
@@ -5057,14 +5475,14 @@ except:
 predict_button = st.sidebar.button("🚀 Generate Forecast")
 
 # =========================================================
-# MODEL RUN
+# MODEL
 # =========================================================
 
 if predict_button:
 
     with st.spinner("Running AI Forecast Models..."):
 
-        time.sleep(1.5)
+        time.sleep(1.2)
 
         cat_pred = cat_model.predict(input_df)[0]
         lgb_pred = lgb_model.predict(input_df)[0]
@@ -5082,127 +5500,140 @@ if predict_button:
 
         mean = df["Demand"].mean()
         std = df["Demand"].std()
-        z = (final_pred - mean) / std
 
+        z = (final_pred - mean) / std
         anomaly = abs(z) > 2
 
-        # =====================================================
-        # 🔥 NEW FEATURE: STOCK RECOMMENDATION
-        # =====================================================
+        stock_gap = int(max(0, final_pred - inventory))
 
-        if final_pred > inventory:
-            stock_gap = int(final_pred - inventory)
-        else:
-            stock_gap = 0
+# =========================================================
+# KPI (UNCHANGED)
+# =========================================================
 
-    # =====================================================
-    # KPI
-    # =====================================================
+if predict_button:
 
     st.subheader("📊 Forecast Summary")
 
     col1, col2, col3, col4, col5 = st.columns(5)
 
     with col1:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Forecast Demand</div>
-            <div class="metric-value">{final_pred:.0f}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='metric-title'>Forecast</div><div class='metric-value'>{final_pred:.0f}</div></div>", unsafe_allow_html=True)
 
     with col2:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Confidence</div>
-            <div class="metric-value">{confidence:.1f}%</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='metric-title'>Confidence</div><div class='metric-value'>{confidence:.1f}%</div></div>", unsafe_allow_html=True)
 
     with col3:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Inventory</div>
-            <div class="metric-value">{inventory}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='metric-title'>Inventory</div><div class='metric-value'>{inventory}</div></div>", unsafe_allow_html=True)
 
     with col4:
         status = "Alert" if anomaly else "Normal"
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Status</div>
-            <div class="metric-value">{status}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.markdown(f"<div class='metric-card'><div class='metric-title'>Status</div><div class='metric-value'>{status}</div></div>", unsafe_allow_html=True)
 
-    # 🔥 NEW CARD
     with col5:
-        st.markdown(f"""
-        <div class="metric-card">
-            <div class="metric-title">Stock Needed</div>
-            <div class="metric-value">{stock_gap}</div>
-        </div>
-        """, unsafe_allow_html=True)
-
-    # =====================================================
-    # INSIGHT
-    # =====================================================
+        st.markdown(f"<div class='metric-card'><div class='metric-title'>Stock Needed</div><div class='metric-value'>{stock_gap}</div></div>", unsafe_allow_html=True)
 
     st.subheader("💡 Business Insight")
 
     if final_pred > inventory:
-        st.error(f"""
-        🚨 Stock Shortage Detected  
-        👉 You need to increase stock by **{stock_gap} units**
-        """)
+        st.error(f"Need extra stock: {stock_gap} units")
     else:
-        st.success("Inventory is sufficient for predicted demand.")
+        st.success("Inventory sufficient")
 
-    if anomaly:
-        st.warning("Anomaly detected in demand pattern!")
+# =========================================================
+# ✅ FIXED TAB SECTION (IMPORTANT PART)
+# =========================================================
+
+if predict_button:
+
+    tab1, tab2, tab3 = st.tabs(["📈 Forecast", "📉 Historical Trend", "⚙️ Technical Details"])
 
     # =====================================================
-    # TABS
+    # TAB 1
     # =====================================================
-
-    tab1, tab2, tab3 = st.tabs([
-        "📈 Forecast",
-        "📉 Historical Trend",
-        "⚙️ Technical Details"
-    ])
 
     with tab1:
 
         fig = go.Figure(go.Indicator(
             mode="gauge+number",
             value=final_pred,
-            title={"text": "Forecasted Demand (Units)"},  # 🔥 units added
+            title={"text": "Forecasted Demand (Units)"}
         ))
 
         st.plotly_chart(fig, use_container_width=True)
-
-        st.info(f"Forecast Units: {final_pred:.0f}")
 
         if anomaly:
             st.error(f"Anomaly | Z={z:.2f}")
         else:
             st.success(f"Normal | Z={z:.2f}")
 
+    # =====================================================
+    # TAB 2 (🔥 FIXED HISTORICAL + RED DOT)
+    # =====================================================
+
     with tab2:
 
         st.subheader("Historical Demand Trend")
 
+        hist = df[df["Product ID"].astype(str) == str(product)].copy()
+
+        mean_demand = hist["Demand"].mean()
+        std_demand = hist["Demand"].std()
+
+        hist["z_score"] = (hist["Demand"] - mean_demand) / std_demand
+        hist["anomaly"] = hist["z_score"].abs() > 2
+
+        anomaly_points = hist[hist["anomaly"]]
+
+        fig2 = go.Figure()
+
+        # main line
+        fig2.add_trace(go.Scatter(
+            x=hist["Date"],
+            y=hist["Demand"],
+            mode="lines",
+            name="Demand",
+            line=dict(width=3)
+        ))
+
+        # forecast line
+        fig2.add_hline(y=final_pred, line_dash="dash")
+
+        # 🔴 anomaly dots FIXED
+        fig2.add_trace(go.Scatter(
+            x=anomaly_points["Date"],
+            y=anomaly_points["Demand"],
+            mode="markers",
+            name="Anomaly",
+            marker=dict(color="red", size=10)
+        ))
+
+        st.plotly_chart(fig2, use_container_width=True)
+
+    # =====================================================
+    # TAB 3 (🔥 FIXED TECHNICAL)
+    # =====================================================
+
     with tab3:
 
-        st.subheader("Technical Info")
+        st.subheader("Technical Details")
 
-        st.write(f"Forecast: {final_pred:.2f}")
+        st.write("Model Predictions")
+
+        tech_df = pd.DataFrame({
+            "Model": ["CatBoost", "LightGBM"],
+            "Prediction": [cat_pred, lgb_pred]
+        })
+
+        st.dataframe(tech_df, use_container_width=True)
+
+        st.write(f"Final Forecast: {final_pred:.2f}")
+        st.write(f"Confidence: {confidence:.2f}%")
         st.write(f"Stock Gap: {stock_gap}")
+        st.write(f"Z-Score: {z:.2f}")
 
 # =========================================================
 # FOOTER
 # =========================================================
 
 st.markdown("---")
-st.markdown("### 🧠 AI Demand Forecasting System")
+st.markdown("### 🧠 Smart Demand Forecasting System")
